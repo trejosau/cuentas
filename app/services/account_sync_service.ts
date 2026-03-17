@@ -26,28 +26,28 @@ export class AccountSyncService {
       )
     }
 
-    await db
-      .table('managed_accounts')
-      .insert({
+    let account: ManagedAccount | null = null
+
+    try {
+      account = await ManagedAccount.create({
         slug: input.slug,
         account: input.account,
         password: input.pwd,
         token: '',
-        container_code: input.containerCode,
+        containerCode: input.containerCode,
         status: 'pending',
-        token_status: 'inactive',
-        created_at: new Date(),
-        updated_at: new Date(),
-      })
-      .onConflict('slug')
-      .merge({
-        account: input.account,
-        password: input.pwd,
-        container_code: input.containerCode,
-        updated_at: new Date(),
+        tokenStatus: 'inactive',
+        lastError: null,
       })
 
-    return this.syncBySlug(input.slug, true)
+      await this.syncAccount(account, true)
+      return this.requireAssignedAccount(input.slug)
+    } catch (error) {
+      if (account) {
+        await account.delete()
+      }
+      throw error
+    }
   }
 
   async syncBySlug(slug: string, forceLogin = false) {

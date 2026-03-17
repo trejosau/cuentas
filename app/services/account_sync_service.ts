@@ -1,4 +1,4 @@
-import type { HmcCheckinResponse } from '#dtos/hmc'
+import type { HmcCheckinResponse, HmcConfig } from '#dtos/hmc'
 import AccountSnapshot from '#models/account_snapshot'
 import ManagedAccount from '#models/managed_account'
 import ProjectSnapshot from '#models/project_snapshot'
@@ -168,6 +168,11 @@ export class AccountSyncService {
       }
 
       const client = new HmcClient(account.token)
+      const config = await client.getConfig().catch((error) => {
+        logger.warn({ err: error, account: account.account }, 'Fallo getconfig, se continua con el sync')
+        return null
+      })
+
       const [profile, projectsPayload, checkinPayload, rewards] = await Promise.all([
         client.userinfo(),
         client.myProjects(),
@@ -175,7 +180,7 @@ export class AccountSyncService {
         client.checkConfig(),
       ])
 
-      await this.persistProfile(account, profile, projectsPayload)
+      await this.persistProfile(account, profile, projectsPayload, config)
       await this.persistProjects(account, projectsPayload.my_pro_list ?? [])
       await this.persistCheckin(account, checkinPayload, rewards)
 
@@ -207,9 +212,11 @@ export class AccountSyncService {
   private async persistProfile(
     account: ManagedAccount,
     profile: Record<string, unknown>,
-    projectsPayload: Record<string, any>
+    projectsPayload: Record<string, any>,
+    config: HmcConfig | null
   ) {
     const projects = Array.isArray(projectsPayload.my_pro_list) ? projectsPayload.my_pro_list : []
+    const snapshotPayload = config ? { profile, config } : profile
 
     await db
       .table('account_snapshots')
@@ -223,7 +230,7 @@ export class AccountSyncService {
         recharge: toNumber(profile.recharge),
         active_projects: projects.filter((item) => Number(item.run_status || 0) === 1).length,
         can_checkin: false,
-        payload: JSON.stringify(profile),
+        payload: JSON.stringify(snapshotPayload),
         updated_at: new Date(),
       })
       .onConflict('managed_account_id')
@@ -235,7 +242,7 @@ export class AccountSyncService {
         total_assets: toNumber(profile.total_assets),
         recharge: toNumber(profile.recharge),
         active_projects: projects.filter((item) => Number(item.run_status || 0) === 1).length,
-        payload: JSON.stringify(profile),
+        payload: JSON.stringify(snapshotPayload),
         updated_at: new Date(),
       })
   }

@@ -20,6 +20,12 @@ export default class ServiceNode extends BaseModel {
   declare maxAccounts: number
 
   @column()
+  declare allocationOrder: number
+
+  @column()
+  declare enabled: boolean
+
+  @column()
   declare healthy: boolean
 
   @column.dateTime()

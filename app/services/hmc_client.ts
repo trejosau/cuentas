@@ -18,16 +18,19 @@ export class HmcClient {
     const headers: Record<string, string> = {
       accept: '*/*',
       'content-type': 'application/json',
-      origin: env.get('HMC_ORIGIN'),
-      referer: env.get('HMC_REFERER'),
-      'user-agent': env.get('HMC_USER_AGENT'),
+      origin: env.get('HMC_ORIGIN', 'https://www.hmc-mex.com'),
+      referer: env.get('HMC_REFERER', 'https://www.hmc-mex.com/'),
+      'user-agent': env.get(
+        'HMC_USER_AGENT',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Edg/146.0.0.0'
+      ),
     }
 
     if (this.token) {
       headers.token = this.token
     }
 
-    const response = await fetch(`${env.get('HMC_BASE_URL')}${path}`, {
+    const response = await fetch(`${env.get('HMC_BASE_URL', 'https://mxg.ht-kook.com')}${path}`, {
       method: 'POST',
       headers,
       body: body ? JSON.stringify(body) : undefined,

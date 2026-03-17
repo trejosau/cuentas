@@ -15,15 +15,16 @@ export default await Env.create(new URL('../', import.meta.url), {
   // Node
   NODE_ENV: Env.schema.enum(['development', 'production', 'test'] as const),
   PORT: Env.schema.number(),
-  HOST: Env.schema.string({ format: 'host' }),
-  LOG_LEVEL: Env.schema.string(),
+  HOST: Env.schema.string.optional({ format: 'host' }),
+  LOG_LEVEL: Env.schema.string.optional(),
+  APP_NAME: Env.schema.string.optional(),
 
   // App
-  APP_KEY: Env.schema.secret(),
-  APP_URL: Env.schema.string({ format: 'url', tld: false }),
+  APP_KEY: Env.schema.string.optional(),
+  APP_URL: Env.schema.string.optional({ format: 'url', tld: false }),
 
   // Session
-  SESSION_DRIVER: Env.schema.enum(['cookie', 'memory', 'database'] as const),
+  SESSION_DRIVER: Env.schema.enum.optional(['cookie', 'memory', 'database'] as const),
 
   // Database
   DATABASE_URL: Env.schema.string(),
@@ -33,17 +34,17 @@ export default await Env.create(new URL('../', import.meta.url), {
   INTERNAL_API_TOKEN: Env.schema.string(),
 
   // Container identity
-  CONTAINER_CODE: Env.schema.string(),
-  CONTAINER_NAME: Env.schema.string(),
-  CONTAINER_BASE_URL: Env.schema.string({ format: 'url', tld: false }),
-  CONTAINER_MAX_ACCOUNTS: Env.schema.number(),
-  SYNC_INTERVAL_MINUTES: Env.schema.number(),
-  HEARTBEAT_INTERVAL_SECONDS: Env.schema.number(),
-  TOKEN_REFRESH_WINDOW_SECONDS: Env.schema.number(),
+  CONTAINER_CODE: Env.schema.string.optional(),
+  CONTAINER_NAME: Env.schema.string.optional(),
+  CONTAINER_BASE_URL: Env.schema.string.optional({ format: 'url', tld: false }),
+  CONTAINER_MAX_ACCOUNTS: Env.schema.number.optional(),
+  SYNC_INTERVAL_MINUTES: Env.schema.number.optional(),
+  HEARTBEAT_INTERVAL_SECONDS: Env.schema.number.optional(),
+  TOKEN_REFRESH_WINDOW_SECONDS: Env.schema.number.optional(),
 
   // HMC upstream
-  HMC_BASE_URL: Env.schema.string({ format: 'url', tld: false }),
-  HMC_ORIGIN: Env.schema.string({ format: 'url', tld: false }),
-  HMC_REFERER: Env.schema.string({ format: 'url', tld: false }),
-  HMC_USER_AGENT: Env.schema.string(),
+  HMC_BASE_URL: Env.schema.string.optional({ format: 'url', tld: false }),
+  HMC_ORIGIN: Env.schema.string.optional({ format: 'url', tld: false }),
+  HMC_REFERER: Env.schema.string.optional({ format: 'url', tld: false }),
+  HMC_USER_AGENT: Env.schema.string.optional(),
 })

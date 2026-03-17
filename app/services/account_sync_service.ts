@@ -11,14 +11,16 @@ import { HmcClient } from '#services/hmc_client'
 import { NotificationService } from '#services/notification_service'
 import { decodeTokenExpiry } from '#utils/jwt'
 import { toNumber } from '#utils/numbers'
+import { inferContainerCode } from '#utils/runtime_defaults'
 
 export class AccountSyncService {
   constructor(private readonly notifications = new NotificationService()) {}
 
   async register(input: { slug: string; account: string; pwd: string; containerCode: string }) {
-    if (input.containerCode !== env.get('CONTAINER_CODE')) {
+    const containerCode = env.get('CONTAINER_CODE', inferContainerCode())
+    if (input.containerCode !== containerCode) {
       throw new AppException(
-        `Esta instancia solo administra ${env.get('CONTAINER_CODE')}.`,
+        `Esta instancia solo administra ${containerCode}.`,
         409,
         'WRONG_CONTAINER'
       )
@@ -95,8 +97,9 @@ export class AccountSyncService {
   }
 
   async syncAssignedAccounts() {
+    const containerCode = env.get('CONTAINER_CODE', inferContainerCode())
     const accounts = await ManagedAccount.query()
-      .where('containerCode', env.get('CONTAINER_CODE'))
+      .where('containerCode', containerCode)
       .orderBy('createdAt', 'asc')
 
     for (const account of accounts) {
@@ -118,7 +121,7 @@ export class AccountSyncService {
     }
 
     const minutesSinceSync = DateTime.now().diff(account.lastSyncedAt, 'minutes').minutes
-    return minutesSinceSync >= env.get('SYNC_INTERVAL_MINUTES')
+    return minutesSinceSync >= env.get('SYNC_INTERVAL_MINUTES', 30)
   }
 
   private shouldRefreshToken(account: ManagedAccount) {
@@ -128,7 +131,7 @@ export class AccountSyncService {
     }
 
     const remaining = expiresAt - Math.floor(Date.now() / 1000)
-    return remaining <= env.get('TOKEN_REFRESH_WINDOW_SECONDS')
+    return remaining <= env.get('TOKEN_REFRESH_WINDOW_SECONDS', 180)
   }
 
   private async createAuthenticatedClient(account: ManagedAccount) {
@@ -310,12 +313,13 @@ export class AccountSyncService {
   }
 
   private async requireAssignedAccount(slug: string) {
+    const containerCode = env.get('CONTAINER_CODE', inferContainerCode())
     const account = await ManagedAccount.findBy('slug', slug)
     if (!account) {
       throw new AppException('La cuenta no existe.', 404)
     }
 
-    if (account.containerCode !== env.get('CONTAINER_CODE')) {
+    if (account.containerCode !== containerCode) {
       throw new AppException('La cuenta pertenece a otro contenedor.', 409)
     }
 

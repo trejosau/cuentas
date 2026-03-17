@@ -1,6 +1,7 @@
 import env from '#start/env'
 import app from '@adonisjs/core/services/app'
 import { defineConfig, syncDestination, targets } from '@adonisjs/core/logger'
+import { inferAppName } from '#utils/runtime_defaults'
 
 const loggerConfig = defineConfig({
   /**
@@ -18,12 +19,12 @@ const loggerConfig = defineConfig({
       /**
        * Logger name shown in log records.
        */
-      name: env.get('APP_NAME'),
+      name: env.get('APP_NAME', inferAppName()),
 
       /**
        * Minimum level to output (trace, debug, info, warn, error, fatal).
        */
-      level: env.get('LOG_LEVEL'),
+      level: env.get('LOG_LEVEL', 'info'),
 
       /**
        * Use sync destination in non-production for immediate flush.

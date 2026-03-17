@@ -23,7 +23,7 @@ async function safeSync() {
 }
 
 void safeHeartbeat()
-setInterval(() => void safeHeartbeat(), env.get('HEARTBEAT_INTERVAL_SECONDS') * 1000)
+setInterval(() => void safeHeartbeat(), env.get('HEARTBEAT_INTERVAL_SECONDS', 60) * 1000)
 
 setTimeout(() => void safeSync(), 1500)
-setInterval(() => void safeSync(), env.get('SYNC_INTERVAL_MINUTES') * 60_000)
+setInterval(() => void safeSync(), env.get('SYNC_INTERVAL_MINUTES', 30) * 60_000)

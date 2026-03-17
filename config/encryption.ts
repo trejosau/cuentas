@@ -1,5 +1,6 @@
 import env from '#start/env'
 import { defineConfig, drivers } from '@adonisjs/core/encryption'
+import { inferAppKey } from '#utils/runtime_defaults'
 
 const encryptionConfig = defineConfig({
   /**
@@ -13,7 +14,7 @@ const encryptionConfig = defineConfig({
        * Keys used for encryption/decryption.
        * First key encrypts, all keys are tried for decryption.
        */
-      keys: [env.get('APP_KEY')],
+      keys: [env.get('APP_KEY', inferAppKey())],
 
       /**
        * Stable identifier for this driver.

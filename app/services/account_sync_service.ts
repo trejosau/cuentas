@@ -58,8 +58,7 @@ export class AccountSyncService {
 
   async performCheckin(slug: string) {
     const account = await this.requireAssignedAccount(slug)
-    const client = await this.createAuthenticatedClient(account)
-    const result = await client.performCheckin()
+    const result = await this.withAuthRetry(account, (client) => client.performCheckin())
     await this.syncAccount(account, false)
 
     await this.notifications.push({
@@ -80,8 +79,9 @@ export class AccountSyncService {
       throw new AppException('El proyecto solicitado no existe para esta cuenta.', 404)
     }
 
-    const client = await this.createAuthenticatedClient(account)
-    const result = await client.receiveProfit(project.remoteOrderId, project.extraFlag)
+    const result = await this.withAuthRetry(account, (client) =>
+      client.receiveProfit(project.remoteOrderId, project.extraFlag)
+    )
     await this.syncAccount(account, false)
 
     await this.notifications.push({
@@ -112,11 +112,7 @@ export class AccountSyncService {
   }
 
   private shouldSync(account: ManagedAccount) {
-    if (!account.lastSyncedAt || account.lastError) {
-      return true
-    }
-
-    if (this.shouldRefreshToken(account)) {
+    if (!account.lastSyncedAt || account.lastError || !account.token) {
       return true
     }
 
@@ -124,18 +120,8 @@ export class AccountSyncService {
     return minutesSinceSync >= env.get('SYNC_INTERVAL_MINUTES', 30)
   }
 
-  private shouldRefreshToken(account: ManagedAccount) {
-    const expiresAt = account.tokenExpiresAt ?? decodeTokenExpiry(account.token)
-    if (!account.token || !expiresAt) {
-      return true
-    }
-
-    const remaining = expiresAt - Math.floor(Date.now() / 1000)
-    return remaining <= env.get('TOKEN_REFRESH_WINDOW_SECONDS', 180)
-  }
-
   private async createAuthenticatedClient(account: ManagedAccount) {
-    if (this.shouldRefreshToken(account)) {
+    if (!account.token) {
       await this.refreshToken(account)
     }
 
@@ -145,6 +131,31 @@ export class AccountSyncService {
 
     const client = new HmcClient(account.token)
     return client
+  }
+
+  private isAuthInvalidError(error: unknown) {
+    return error instanceof AppException && error.code === 'HMC_AUTH_INVALID'
+  }
+
+  private async withAuthRetry<T>(
+    account: ManagedAccount,
+    callback: (client: HmcClient) => Promise<T>,
+    options: { forceLogin?: boolean } = {}
+  ) {
+    if (options.forceLogin || !account.token) {
+      await this.refreshToken(account)
+    }
+
+    try {
+      return await callback(await this.createAuthenticatedClient(account))
+    } catch (error) {
+      if (!this.isAuthInvalidError(error)) {
+        throw error
+      }
+
+      await this.refreshToken(account)
+      return callback(await this.createAuthenticatedClient(account))
+    }
   }
 
   private async refreshToken(account: ManagedAccount) {
@@ -163,22 +174,17 @@ export class AccountSyncService {
 
   private async syncAccount(account: ManagedAccount, forceLogin: boolean) {
     try {
-      if (forceLogin || this.shouldRefreshToken(account)) {
-        await this.refreshToken(account)
-      }
-
-      const client = new HmcClient(account.token)
-      const config = await client.getConfig().catch((error) => {
+      const config = await new HmcClient().getConfig().catch((error) => {
         logger.warn({ err: error, account: account.account }, 'Fallo getconfig, se continua con el sync')
         return null
       })
 
-      const [profile, projectsPayload, checkinPayload, rewards] = await Promise.all([
-        client.userinfo(),
-        client.myProjects(),
-        client.checkinStatus(),
-        client.checkConfig(),
-      ])
+      const [profile, projectsPayload, checkinPayload, rewards] = await this.withAuthRetry(
+        account,
+        (client) =>
+          Promise.all([client.userinfo(), client.myProjects(), client.checkinStatus(), client.checkConfig()]),
+        { forceLogin }
+      )
 
       await this.persistProfile(account, profile, projectsPayload, config)
       await this.persistProjects(account, projectsPayload.my_pro_list ?? [])
@@ -192,6 +198,7 @@ export class AccountSyncService {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo sincronizar la cuenta.'
       account.status = 'error'
+      account.tokenStatus = this.isAuthInvalidError(error) || !account.token ? 'inactive' : account.tokenStatus
       account.lastError = message
       account.lastSyncedAt = DateTime.now()
       await account.save()

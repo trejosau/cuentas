@@ -11,10 +11,10 @@ export function inferContainerCode() {
   }
 
   if (railwayPublicDomain) {
-    return railwayPublicDomain.split('.')[0] || 'cuentas-local'
+    return railwayPublicDomain.split('.')[0] || 'cuentas'
   }
 
-  return railwayServiceName || 'cuentas-local'
+  return railwayServiceName || 'cuentas'
 }
 
 export function inferContainerName() {

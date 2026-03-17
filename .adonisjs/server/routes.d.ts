@@ -4,21 +4,26 @@ type ParamValue = string | number | bigint | boolean
 
 export type ScannedRoutes = {
   ALL: {
-    'auth.new_account.store': { paramsTuple?: []; params?: {} }
-    'auth.access_token.store': { paramsTuple?: []; params?: {} }
-    'auth.access_token.destroy': { paramsTuple?: []; params?: {} }
-    'profile.profile.show': { paramsTuple?: []; params?: {} }
+    'health.index': { paramsTuple?: []; params?: {} }
+    'internal_accounts.store': { paramsTuple?: []; params?: {} }
+    'internal_accounts.show': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
+    'internal_accounts.sync': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
+    'internal_accounts.checkin': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
+    'internal_accounts.receive': { paramsTuple: [ParamValue,ParamValue]; params: {'slug': ParamValue,'projectId': ParamValue} }
   }
   GET: {
-    'profile.profile.show': { paramsTuple?: []; params?: {} }
+    'health.index': { paramsTuple?: []; params?: {} }
+    'internal_accounts.show': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
   }
   HEAD: {
-    'profile.profile.show': { paramsTuple?: []; params?: {} }
+    'health.index': { paramsTuple?: []; params?: {} }
+    'internal_accounts.show': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
   }
   POST: {
-    'auth.new_account.store': { paramsTuple?: []; params?: {} }
-    'auth.access_token.store': { paramsTuple?: []; params?: {} }
-    'auth.access_token.destroy': { paramsTuple?: []; params?: {} }
+    'internal_accounts.store': { paramsTuple?: []; params?: {} }
+    'internal_accounts.sync': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
+    'internal_accounts.checkin': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
+    'internal_accounts.receive': { paramsTuple: [ParamValue,ParamValue]; params: {'slug': ParamValue,'projectId': ParamValue} }
   }
 }
 declare module '@adonisjs/core/types/http' {

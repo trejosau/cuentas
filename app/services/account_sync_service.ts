@@ -112,7 +112,7 @@ export class AccountSyncService {
   }
 
   private shouldSync(account: ManagedAccount) {
-    if (!account.lastSyncedAt || account.lastError || !account.token) {
+    if (!account.lastSyncedAt || account.lastError || this.shouldRefreshToken(account)) {
       return true
     }
 
@@ -120,8 +120,43 @@ export class AccountSyncService {
     return minutesSinceSync >= env.get('SYNC_INTERVAL_MINUTES', 30)
   }
 
-  private async createAuthenticatedClient(account: ManagedAccount) {
+  private getCurrentTimestamp() {
+    return Math.floor(DateTime.now().toSeconds())
+  }
+
+  private isTokenExpired(account: ManagedAccount) {
+    return Boolean(account.token && account.tokenExpiresAt && account.tokenExpiresAt <= this.getCurrentTimestamp())
+  }
+
+  private shouldRefreshToken(account: ManagedAccount) {
     if (!account.token) {
+      return true
+    }
+
+    if (account.tokenStatus !== 'active') {
+      return true
+    }
+
+    if (!account.tokenExpiresAt) {
+      return false
+    }
+
+    const refreshWindow = Math.max(env.get('TOKEN_REFRESH_WINDOW_SECONDS', 300), 0)
+    return account.tokenExpiresAt <= this.getCurrentTimestamp() + refreshWindow
+  }
+
+  private async markTokenInactive(account: ManagedAccount, persist = false) {
+    account.token = ''
+    account.tokenExpiresAt = null
+    account.tokenStatus = 'inactive'
+
+    if (persist) {
+      await account.save()
+    }
+  }
+
+  private async createAuthenticatedClient(account: ManagedAccount) {
+    if (this.shouldRefreshToken(account)) {
       await this.refreshToken(account)
     }
 
@@ -142,7 +177,7 @@ export class AccountSyncService {
     callback: (client: HmcClient) => Promise<T>,
     options: { forceLogin?: boolean } = {}
   ) {
-    if (options.forceLogin || !account.token) {
+    if (options.forceLogin || this.shouldRefreshToken(account)) {
       await this.refreshToken(account)
     }
 
@@ -153,23 +188,35 @@ export class AccountSyncService {
         throw error
       }
 
+      await this.markTokenInactive(account, true)
       await this.refreshToken(account)
       return callback(await this.createAuthenticatedClient(account))
     }
   }
 
   private async refreshToken(account: ManagedAccount) {
-    const token = await new HmcClient().login(account.account, account.password)
-    if (!token) {
-      throw new AppException('El login no devolvio token.', 502)
-    }
+    const shouldInvalidateOnFailure =
+      !account.token || account.tokenStatus !== 'active' || this.isTokenExpired(account)
 
-    account.token = token
-    account.tokenExpiresAt = decodeTokenExpiry(token)
-    account.tokenStatus = 'active'
-    account.status = 'active'
-    account.lastError = null
-    await account.save()
+    try {
+      const token = await new HmcClient().login(account.account, account.password)
+      if (!token) {
+        throw new AppException('El login no devolvio token.', 502)
+      }
+
+      account.token = token
+      account.tokenExpiresAt = decodeTokenExpiry(token)
+      account.tokenStatus = 'active'
+      account.status = 'active'
+      account.lastError = null
+      await account.save()
+    } catch (error) {
+      if (shouldInvalidateOnFailure) {
+        await this.markTokenInactive(account, true)
+      }
+
+      throw error
+    }
   }
 
   private async syncAccount(account: ManagedAccount, forceLogin: boolean) {

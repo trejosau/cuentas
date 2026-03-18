@@ -29,18 +29,28 @@ export class HmcClient {
     if (!normalized) return false
 
     return [
+      'sesion expirada',
+      'sesion ha expirado',
       'sessao expirada',
       'sessao expirou',
       'session expired',
       'login expirou',
       'efetue login novamente',
+      'usuario no ha iniciado sesion',
+      'no ha iniciado sesion',
+      'usuario no conectado',
       'usuario nao esta conectado',
       'user is not connected',
       'not connected',
+      'sesion invalida',
       'token invalido',
       'invalid token',
       'unauthorized',
     ].some((fragment) => normalized.includes(fragment))
+  }
+
+  private isAuthFailurePayload(payload: HmcEnvelope<unknown>) {
+    return payload.code === -2 || this.isAuthFailureMessage(payload.msg)
   }
 
   private buildResponseSnippet(rawText: string) {
@@ -161,7 +171,10 @@ export class HmcClient {
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       const detail = payload.msg || this.buildResponseSnippet(rawText)
-      if (options.requiresToken && [401, 403].includes(response.statusCode)) {
+      if (
+        options.requiresToken &&
+        ([401, 403].includes(response.statusCode) || this.isAuthFailurePayload(payload))
+      ) {
         throw new AppException(`HMC ${path}: ${detail}.`, 401, 'HMC_AUTH_INVALID')
       }
 
@@ -173,7 +186,7 @@ export class HmcClient {
     }
 
     if (payload.code !== 0) {
-      if (options.requiresToken && this.isAuthFailureMessage(payload.msg)) {
+      if (options.requiresToken && this.isAuthFailurePayload(payload)) {
         throw new AppException(`HMC ${path}: ${payload.msg || 'sesion invalida'}.`, 401, 'HMC_AUTH_INVALID')
       }
 
